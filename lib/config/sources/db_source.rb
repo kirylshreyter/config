@@ -14,7 +14,6 @@ module Config
 
       def load
         connection_pool = ActiveRecord::Base.connection_pool
-        connection_pool.lock_thread = true
         conn = ActiveRecord::Base.retrieve_connection
 
         if table && conn && connection_pool.connected? && conn.table_exists?(table)
@@ -22,9 +21,6 @@ module Config
           file_contents = { table => parse_values(ActiveRecord::Base.connection.execute(sql).to_h) }
           result = file_contents.with_indifferent_access
         end
-
-        connection_pool.connection.close if connection_pool.active_connection?
-        connection_pool.disconnect! if connection_pool.connected?
 
         result.presence || {}
       rescue ActiveRecord::NoDatabaseError
