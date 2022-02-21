@@ -4,10 +4,11 @@ require 'erb'
 module Config
   module Sources
     class DbSource
-      attr_reader :table, :config_line, :db_config
+      attr_reader :table, :config_line, :db_config, :keys
 
-      def initialize(table)
-        @table = table.to_s
+      def initialize(options)
+        @table = options.is_a?(Hash) ? options[:table].to_s : options
+        @keys = options.is_a?(Hash) ? options[:keys].to_a.map { |key| "'#{key}'" } : []
         @db_config = File.read(Config.database_yml_path)
         @retry_count = 0
       end
@@ -17,8 +18,7 @@ module Config
         conn = ActiveRecord::Base.retrieve_connection
 
         if table && conn && connection_pool.connected? && conn.table_exists?(table)
-          sql = "select `#{Config.key_key}`, `#{Config.value_key}` from #{table};"
-          file_contents = { table => parse_values(ActiveRecord::Base.connection.execute(sql).to_h) }
+          file_contents = { table => parse_values(ActiveRecord::Base.connection.execute(_sql).to_h) }
           result = file_contents.with_indifferent_access
         end
 
@@ -41,6 +41,12 @@ module Config
         raise "YAML syntax error occurred while parsing config item #{config_line}. " \
                 "Please note that YAML must be consistently indented using spaces. Tabs are not allowed. " \
                 "Error: #{e.message}"
+      end
+
+      def _sql
+        result = "SELECT `#{Config.key_key}`, `#{Config.value_key}` FROM `#{table}`"
+        append = keys.empty? ? ';' : " WHERE `#{Config.key_key}` IN (#{keys.join(',')});"
+        result.concat(append)
       end
     end
   end
