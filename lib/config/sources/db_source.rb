@@ -22,6 +22,8 @@ module Config
           result = file_contents.with_indifferent_access
         end
 
+        conn.close
+
         result.presence || {}
       rescue ActiveRecord::NoDatabaseError
         {}
