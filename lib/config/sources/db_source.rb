@@ -4,11 +4,12 @@ require 'erb'
 module Config
   module Sources
     class DbSource
-      attr_reader :table, :config_line, :db_config, :keys
+      attr_reader :table, :config_line, :db_config, :keys, :conditions
 
       def initialize(options)
         @table = options.is_a?(Hash) ? options[:table].to_s : options
         @keys = options.is_a?(Hash) ? options[:keys].to_a.map { |key| "'#{key}'" } : []
+        @conditions = options.is_a?(Hash) ? prepare_conditions(options[:conditions]) : []
         @db_config = File.read(Config.database_yml_path)
         @retry_count = 0
       end
@@ -47,8 +48,21 @@ module Config
 
       def _sql
         result = "SELECT `#{Config.key_key}`, `#{Config.value_key}` FROM `#{table}`"
-        append = keys.empty? ? ';' : " WHERE `#{Config.key_key}` IN (#{keys.join(',')});"
-        result.concat(append)
+        if !keys.empty?
+          result += " WHERE `#{Config.key_key}` IN (#{keys.join(',')})"
+          result += " AND #{conditions}" unless conditions.empty?
+        else
+          result += " WHERE #{conditions}" unless conditions.empty?
+        end
+        "#{result};"
+      end
+
+      def prepare_conditions(conditions)
+        conditions.to_h.each_with_object([]) do |(key, value), memo|
+          next if value.nil?
+
+          memo << "`#{key}` = #{value.is_a?(Numeric) ? "#{value}" : "'#{value}'" }"
+        end.join(' AND ')
       end
     end
   end
