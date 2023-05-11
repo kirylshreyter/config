@@ -1,25 +1,25 @@
 require 'yaml'
 require 'erb'
+require 'corevist_api'
 
 module Config
   module Sources
     class DbSource
-      attr_reader :table, :config_line, :db_config, :keys, :conditions
+      attr_reader :table, :config_line, :keys, :conditions
 
       def initialize(options)
         @table = options.is_a?(Hash) ? options[:table].to_s : options
         @keys = options.is_a?(Hash) ? options[:keys].to_a.map { |key| "'#{key}'" } : []
         @conditions = options.is_a?(Hash) ? prepare_conditions(options[:conditions]) : []
-        @db_config = File.read(Config.database_yml_path)
         @retry_count = 0
       end
 
       def load
-        connection_pool = ActiveRecord::Base.connection_pool
-        conn = ActiveRecord::Base.retrieve_connection
+        connection_pool = CorevistAPI::ApplicationRecord.connection_pool
+        conn = CorevistAPI::ApplicationRecord.retrieve_connection
 
         if table && conn && connection_pool.connected? && conn.table_exists?(table)
-          file_contents = { table => parse_values(ActiveRecord::Base.connection.execute(_sql).to_h) }
+          file_contents = { table => parse_values(CorevistAPI::ApplicationRecord.connection.execute(_sql).to_h) }
           result = file_contents.with_indifferent_access
         end
 
@@ -29,7 +29,7 @@ module Config
       rescue ActiveRecord::NoDatabaseError
         {}
       rescue ActiveRecord::ConnectionNotEstablished => exception
-        config = YAML.load(db_config)[Rails.env]
+        config = CorevistAPI::ApplicationRecord.configurations.configs_for(env_name: Rails.env, name: 'default')
         ActiveRecord::Base.establish_connection(config)
         @retry_count += 1 and retry if @retry_count < 1
 
