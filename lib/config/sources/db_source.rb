@@ -1,6 +1,5 @@
 require 'yaml'
 require 'erb'
-require 'corevist_api'
 
 module Config
   module Sources
